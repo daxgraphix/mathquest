@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, Zap, Swords, Heart, Flame, Timer, Star, ArrowLeft, Play, RotateCcw, Lock, Check, Skull, Circle, Sparkles, Activity, ArrowRight, Shield, Cpu, Target, Zap as Lightning, Award, Crown, Medal, Gem, Skull as SkullIcon, Shield as ShieldIcon, Sword, TrendingUp, X, ChevronRight, Sparkle, Flame as FlameIcon, Home, Pause } from 'lucide-react';
+import { Trophy, Zap, Swords, Heart, Flame, Timer, Star, ArrowLeft, Play, RotateCcw, Lock, Check, Skull, Circle, Sparkles, Activity, ArrowRight, Shield, Cpu, Target, Zap as Lightning, Award, Crown, Medal, Gem, Skull as SkullIcon, Shield as ShieldIcon, Sword, TrendingUp, X, ChevronRight, Sparkle, Flame as FlameIcon, Home, Pause, SkipForward } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { Player, Difficulty, MathProblem } from '../../types';
 import confetti from 'canvas-confetti';
 import GameMenu, { GameMenuButton } from '../GameMenu';
+import OnScreenKeyboard from '../OnScreenKeyboard';
 
 type GameState = 'levelselect' | 'intro' | 'ready' | 'battling' | 'finished' | 'levelcomplete' | 'gameover';
 
 const TOTAL_LEVELS = 20;
-const QUESTIONS_PER_LEVEL = 15;
+const QUESTIONS_PER_LEVEL = 55;
 
 interface Level {
   level: number;
@@ -24,9 +25,9 @@ interface Level {
 }
 
 const DIFFICULTY_CONFIG: Record<Difficulty, { timePerQuestion: number; hp: number; aiSpeed: number; pointsPerCorrect: number }> = {
-  easy: { timePerQuestion: 20, hp: 999, aiSpeed: 0.5, pointsPerCorrect: 100 },
-  medium: { timePerQuestion: 15, hp: 999, aiSpeed: 0.75, pointsPerCorrect: 150 },
-  hard: { timePerQuestion: 10, hp: 999, aiSpeed: 1.0, pointsPerCorrect: 250 }
+  easy: { timePerQuestion: 120, hp: 999, aiSpeed: 0.5, pointsPerCorrect: 100 },
+  medium: { timePerQuestion: 120, hp: 999, aiSpeed: 0.75, pointsPerCorrect: 150 },
+  hard: { timePerQuestion: 120, hp: 999, aiSpeed: 1.0, pointsPerCorrect: 250 }
 };
 
 // Progressive difficulty - from simple to hardest as level increases
@@ -60,7 +61,84 @@ const generateProblem = (selectedLevel: number): MathProblem => {
   
   let num1: number, num2: number, answer: number, question: string;
   
-  // For higher levels, create more challenging multi-step problems
+  // For highest levels (15+), add more 3-step and 4-step multi-operation problems
+  if (selectedLevel >= 15) {
+    const advancedTypes = ['multi-step-3a', 'multi-step-3b', 'multi-step-4a', 'multi-step-4b'];
+    const type = advancedTypes[Math.floor(Math.random() * advancedTypes.length)];
+    
+    switch (type) {
+      case 'multi-step-3a': {
+        // (a + b) × c + d
+        const a = Math.floor(Math.random() * 6) + 2;
+        const b = Math.floor(Math.random() * 6) + 2;
+        const c = Math.floor(Math.random() * 5) + 2;
+        const d = Math.floor(Math.random() * 10) + 1;
+        answer = (a + b) * c + d;
+        question = `(${a} + ${b}) × ${c} + ${d}`;
+        return {
+          question,
+          answer,
+          num1: a,
+          num2: b,
+          operation: '*' as any,
+          difficulty: levelConfig.difficulty as Difficulty
+        };
+      }
+      case 'multi-step-3b': {
+        // a × b - c + d
+        const a = Math.floor(Math.random() * 6) + 2;
+        const b = Math.floor(Math.random() * 6) + 2;
+        const c = Math.floor(Math.random() * 8) + 1;
+        const d = Math.floor(Math.random() * 10) + 1;
+        answer = a * b - c + d;
+        question = `${a} × ${b} - ${c} + ${d}`;
+        return {
+          question,
+          answer,
+          num1: a,
+          num2: b,
+          operation: '*' as any,
+          difficulty: levelConfig.difficulty as Difficulty
+        };
+      }
+      case 'multi-step-4a': {
+        // (a + b) × (c + d)
+        const a = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 5) + 1;
+        const c = Math.floor(Math.random() * 4) + 2;
+        const d = Math.floor(Math.random() * 4) + 1;
+        answer = (a + b) * (c + d);
+        question = `(${a} + ${b}) × (${c} + ${d})`;
+        return {
+          question,
+          answer,
+          num1: a,
+          num2: b,
+          operation: '*' as any,
+          difficulty: levelConfig.difficulty as Difficulty
+        };
+      }
+      case 'multi-step-4b': {
+        // a × b + c × d
+        const a = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 5) + 2;
+        const c = Math.floor(Math.random() * 5) + 2;
+        const d = Math.floor(Math.random() * 5) + 2;
+        answer = a * b + c * d;
+        question = `${a} × ${b} + ${c} × ${d}`;
+        return {
+          question,
+          answer,
+          num1: a,
+          num2: b,
+          operation: '*' as any,
+          difficulty: levelConfig.difficulty as Difficulty
+        };
+      }
+    }
+  }
+  
+  // For higher levels (10-14), create more challenging multi-step problems
   if (selectedLevel >= 10) {
     // Multi-step challenge problems with parentheses
     const ops1 = ['+', '-', '*'];
@@ -496,7 +574,7 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
   // Level Select Screen - Professional Design
   if (gameState === 'levelselect') {
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white p-4 sm:p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white p-4 sm:p-6 overflow-y-auto">
         {/* Animated Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
@@ -744,7 +822,7 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
     const progress = (round / QUESTIONS_PER_LEVEL) * 100;
     
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white overflow-hidden">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 text-white overflow-y-scroll min-h-screen">
         {/* Battle Header */}
         <div className="relative p-3 sm:p-4 border-b border-white/10">
           {/* Progress Bar */}
@@ -805,7 +883,7 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
         </div>
 
         {/* Battle Arena */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-y-auto">
           {/* Feedback Overlay */}
           <AnimatePresence>
             {feedback && (
@@ -883,27 +961,21 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
                 </motion.p>
               </div>
 
-              {/* Answer Input */}
-              <form onSubmit={handleSubmit} className="flex gap-3">
-                <input
-                  ref={inputRef}
-                  type="number"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="?"
-                  className="flex-1 bg-white/10 border-2 border-white/20 rounded-xl px-6 py-4 text-2xl sm:text-3xl font-bold text-center text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 transition-all"
-                  autoComplete="off"
-                />
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={!answer.trim()}
-                  className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 disabled:from-gray-600 disabled:to-gray-700 rounded-xl font-bold text-lg shadow-lg shadow-orange-500/30 disabled:shadow-none transition-all"
-                >
-                  ANSWER
-                </motion.button>
-              </form>
+              {/* Answer Input with On-Screen Keyboard */}
+              <OnScreenKeyboard
+                value={answer}
+                onChange={setAnswer}
+                onSubmit={handleSubmit}
+                onSkip={() => {
+                  setAnswer('');
+                  const problem = generateProblem(selectedLevel);
+                  setCurrentProblem(problem);
+                  setTimeLeft(60);
+                }}
+                placeholder="?"
+                disabled={gameState !== 'battling'}
+                inputClassName="bg-white/10 border-2 border-white/20 text-white placeholder-gray-500 focus:border-orange-500/50"
+              />
             </div>
           </motion.div>
 
@@ -929,17 +1001,17 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
         </div>
 
         {/* Controls */}
-        <div className="p-3 sm:p-4 border-t border-white/10">
+        <div className="p-4 sm:p-5 border-t border-white/10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Home Button */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => onComplete(0, 0)}
-                className="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-blue-500/30 hover:bg-blue-500/50 border-2 border-blue-500/50 rounded-xl font-bold flex items-center gap-2 text-base shadow-lg shadow-blue-500/20"
               >
-                <Home className="w-4 h-4" /> HOME
+                <Home className="w-5 h-5" /> HOME
               </motion.button>
               
               {/* Back Button */}
@@ -947,9 +1019,9 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setGameState('levelselect')}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-white/20 hover:bg-white/30 border-2 border-white/30 rounded-xl font-bold flex items-center gap-2 text-base"
               >
-                <ArrowLeft className="w-4 h-4" /> BACK
+                <ArrowLeft className="w-5 h-5" /> BACK
               </motion.button>
               
               {/* Pause/Resume Button */}
@@ -957,6 +1029,11 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
+                  // Clear any existing timer immediately when pausing
+                  if (timerRef.current) {
+                    clearTimeout(timerRef.current);
+                    timerRef.current = undefined;
+                  }
                   if (isTimerRunning) {
                     setIsTimerRunning(false);
                     setShowMenu(true);
@@ -966,16 +1043,16 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
                   }
                 }}
                 className={cn(
-                  "px-3 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm",
+                  "px-5 py-3 rounded-xl font-bold flex items-center gap-2 text-base border-2 shadow-lg cursor-pointer z-50",
                   isTimerRunning 
-                    ? "bg-yellow-500/20 hover:bg-yellow-500/30" 
-                    : "bg-green-500/20 hover:bg-green-500/30"
+                    ? "bg-yellow-500/30 hover:bg-yellow-500/50 border-yellow-500/50 text-yellow-300 shadow-yellow-500/20" 
+                    : "bg-green-500/30 hover:bg-green-500/50 border-green-500/50 text-green-300 shadow-green-500/20"
                 )}
               >
                 {isTimerRunning ? (
-                  <><Pause className="w-4 h-4" /> PAUSE</>
+                  <><Pause className="w-5 h-5" /> PAUSE</>
                 ) : (
-                  <><Play className="w-4 h-4" /> RESUME</>
+                  <><Play className="w-5 h-5" /> RESUME</>
                 )}
               </motion.button>
               
@@ -984,9 +1061,9 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleRestart}
-                className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-purple-500/30 hover:bg-purple-500/50 border-2 border-purple-500/50 rounded-xl font-bold flex items-center gap-2 text-base shadow-lg shadow-purple-500/20"
               >
-                <RotateCcw className="w-4 h-4" /> RESTART
+                <RotateCcw className="w-5 h-5" /> RESTART
               </motion.button>
             </div>
             
@@ -1195,7 +1272,7 @@ export default function BattleGame({ player, onComplete, difficulty = 'medium', 
   // Menu Overlay
   if (showMenu) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

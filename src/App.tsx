@@ -1044,7 +1044,7 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 bg-slate-900 z-50 overflow-hidden"
+            className="fixed inset-0 bg-slate-900 z-50 overflow-y-scroll min-h-screen"
           >
             {renderGame()}
           </motion.div>

@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Player, Difficulty, MathProblem } from '../../types';
 import { motion, AnimatePresence } from 'motion/react';
-import { Star, Trophy, Hammer, Clock, Construction, ArrowRight, ArrowLeft, Lock, Check, Skull, Circle, Sparkles, Zap, Wind, RotateCcw, Flame, ChevronRight, Shield, X, Gem, Award, Medal, Crown, Activity, Hammer as HammerIcon, Target, Zap as Lightning, Home, Pause, Play } from 'lucide-react';
+import { Star, Trophy, Hammer, Clock, Construction, ArrowRight, ArrowLeft, Lock, Check, Skull, Circle, Sparkles, Zap, Wind, RotateCcw, Flame, ChevronRight, Shield, X, Gem, Award, Medal, Crown, Activity, Hammer as HammerIcon, Target, Zap as Lightning, Home, Pause, Play, SkipForward } from 'lucide-react';
 import { Button } from '../Button';
 import GameMenu from '../GameMenu';
 import { cn } from '../../lib/utils';
 import confetti from 'canvas-confetti';
+import OnScreenKeyboard from '../OnScreenKeyboard';
 
 type GameState = 'levelselect' | 'intro' | 'playing' | 'finished' | 'levelcomplete' | 'gameover';
 
 const TOTAL_LEVELS = 20;
-const QUESTIONS_PER_LEVEL = 15;
+const QUESTIONS_PER_LEVEL = 55;
 
 interface Level {
   level: number;
@@ -66,6 +67,55 @@ const generateProblem = (selectedLevel: number): MathProblem => {
   };
   
   let num1: number, num2: number, answer: number, question: string;
+  
+  // For highest levels (15+), add more 3-step and 4-step multi-operation problems
+  if (selectedLevel >= 15) {
+    const advancedTypes = ['multi-step-3a', 'multi-step-3b', 'multi-step-4a', 'multi-step-4b'];
+    const type = advancedTypes[Math.floor(Math.random() * advancedTypes.length)];
+    
+    switch (type) {
+      case 'multi-step-3a': {
+        // (a + b) × c + d
+        const a = Math.floor(Math.random() * 6) + 2;
+        const b = Math.floor(Math.random() * 6) + 2;
+        const c = Math.floor(Math.random() * 5) + 2;
+        const d = Math.floor(Math.random() * 10) + 1;
+        answer = (a + b) * c + d;
+        question = `(${a} + ${b}) × ${c} + ${d}`;
+        return { question, answer, num1: a, num2: b, operation: '*' as any, difficulty: levelConfig.difficulty as Difficulty };
+      }
+      case 'multi-step-3b': {
+        // a × b - c + d
+        const a = Math.floor(Math.random() * 6) + 2;
+        const b = Math.floor(Math.random() * 6) + 2;
+        const c = Math.floor(Math.random() * 8) + 1;
+        const d = Math.floor(Math.random() * 10) + 1;
+        answer = a * b - c + d;
+        question = `${a} × ${b} - ${c} + ${d}`;
+        return { question, answer, num1: a, num2: b, operation: '*' as any, difficulty: levelConfig.difficulty as Difficulty };
+      }
+      case 'multi-step-4a': {
+        // (a + b) × (c + d)
+        const a = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 5) + 1;
+        const c = Math.floor(Math.random() * 4) + 2;
+        const d = Math.floor(Math.random() * 4) + 1;
+        answer = (a + b) * (c + d);
+        question = `(${a} + ${b}) × (${c} + ${d})`;
+        return { question, answer, num1: a, num2: b, operation: '*' as any, difficulty: levelConfig.difficulty as Difficulty };
+      }
+      case 'multi-step-4b': {
+        // a × b + c × d
+        const a = Math.floor(Math.random() * 5) + 2;
+        const b = Math.floor(Math.random() * 5) + 2;
+        const c = Math.floor(Math.random() * 5) + 2;
+        const d = Math.floor(Math.random() * 5) + 2;
+        answer = a * b + c * d;
+        question = `${a} × ${b} + ${c} × ${d}`;
+        return { question, answer, num1: a, num2: b, operation: '*' as any, difficulty: levelConfig.difficulty as Difficulty };
+      }
+    }
+  }
   
   // For higher levels, create multi-step challenge problems
   if (selectedLevel >= 10) {
@@ -182,7 +232,9 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
   const [bridgeSegments, setBridgeSegments] = useState(0);
   const [maxSegments] = useState(10);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(timeLimit || 60);
+  const [timeLeft, setTimeLeft] = useState(timeLimit || 120);
+  const [isTimerRunning, setIsTimerRunning] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const [problemStartTime, setProblemStartTime] = useState(Date.now());
   const [feedback, setFeedback] = useState<string | null>(null);
   const [combo, setCombo] = useState(0);
@@ -209,8 +261,9 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
     setCorrectAnswers(0);
     setWrongAnswers(0);
     setIsBridgeComplete(false);
-    if (gameMode === 'timed') setTimeLeft(timeLimit || 60);
-    else setTimeLeft(60);
+    setIsTimerRunning(true);
+    if (gameMode === 'timed') setTimeLeft(timeLimit || 120);
+    else setTimeLeft(120);
     loadProblem();
   };
 
@@ -274,8 +327,9 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
   };
 
   useEffect(() => {
-    if (gameState !== 'playing') return;
-    const timer = setInterval(() => {
+    if (gameState !== 'playing' || !isTimerRunning) return;
+    
+    timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           finishGame();
@@ -285,8 +339,13 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
       });
     }, 1000);
     
-    return () => clearInterval(timer);
-  }, [gameState]);
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = undefined;
+      }
+    };
+  }, [gameState, isTimerRunning]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -386,7 +445,7 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
   // Level Select Screen
   if (gameState === 'levelselect') {
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-amber-950 to-slate-950 text-white p-4 sm:p-6 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-amber-950 to-slate-950 text-white p-4 sm:p-6 overflow-y-auto">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
             className="absolute inset-0"
@@ -538,7 +597,7 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
     const progress = (bridgeSegments / maxSegments) * 100;
     
     return (
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-amber-950 to-slate-950 text-white overflow-hidden">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-950 via-amber-950 to-slate-950 text-white overflow-y-scroll min-h-screen">
         <div className="relative p-3 sm:p-4 border-b border-white/10">
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-slate-800">
             <motion.div 
@@ -624,7 +683,7 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
         </div>
 
         {/* Problem Area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <AnimatePresence>
             {feedback && (
               <motion.div
@@ -661,41 +720,35 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
                 </motion.p>
               </div>
 
-              <form onSubmit={handleSubmit} className="flex gap-3">
-                <input
-                  type="number"
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  placeholder="?"
-                  className="flex-1 bg-white/10 border-2 border-white/20 rounded-xl px-6 py-4 text-2xl sm:text-3xl font-bold text-center text-white placeholder-gray-500 focus:outline-none focus:border-amber-500/50 focus:ring-2 focus:ring-amber-500/20 transition-all"
-                  autoFocus
-                />
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  type="submit"
-                  disabled={!answer.trim()}
-                  className="px-8 py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 disabled:from-gray-600 disabled:to-gray-700 rounded-xl font-bold text-lg shadow-lg shadow-amber-500/30 disabled:shadow-none transition-all"
-                >
-                  BUILD!
-                </motion.button>
-              </form>
+              {/* Answer Input with On-Screen Keyboard */}
+              <OnScreenKeyboard
+                value={answer}
+                onChange={setAnswer}
+                onSubmit={handleSubmit}
+                onSkip={() => {
+                  setAnswer('');
+                  loadProblem();
+                }}
+                placeholder="?"
+                disabled={gameState !== 'playing'}
+                inputClassName="bg-white/10 border-2 border-white/20 text-white placeholder-gray-500 focus:border-amber-500/50"
+              />
             </div>
           </motion.div>
         </div>
 
         {/* Controls */}
-        <div className="p-3 sm:p-4 border-t border-white/10">
+        <div className="p-4 sm:p-5 border-t border-white/10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {/* Home Button */}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => onComplete(0, 0)}
-                className="px-3 py-2 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-blue-500/30 hover:bg-blue-500/50 border-2 border-blue-500/50 rounded-xl font-bold flex items-center gap-2 text-base shadow-lg shadow-blue-500/20"
               >
-                <Home className="w-4 h-4" /> HOME
+                <Home className="w-5 h-5" /> HOME
               </motion.button>
               
               {/* Back Button */}
@@ -703,9 +756,9 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setGameState('levelselect')}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-white/20 hover:bg-white/30 border-2 border-white/30 rounded-xl font-bold flex items-center gap-2 text-base"
               >
-                <ArrowLeft className="w-4 h-4" /> BACK
+                <ArrowLeft className="w-5 h-5" /> BACK
               </motion.button>
               
               {/* Pause/Resume Button */}
@@ -713,24 +766,30 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
-                  if (gameState === 'playing') {
+                  // Clear any existing timer immediately when pausing
+                  if (timerRef.current) {
+                    clearInterval(timerRef.current);
+                    timerRef.current = undefined;
+                  }
+                  if (isTimerRunning) {
+                    setIsTimerRunning(false);
                     setShowMenu(true);
                   } else {
+                    setIsTimerRunning(true);
                     setShowMenu(false);
-                    setGameState('playing');
                   }
                 }}
                 className={cn(
-                  "px-3 py-2 rounded-lg font-medium flex items-center gap-1.5 text-sm",
-                  gameState === 'playing' 
-                    ? "bg-yellow-500/20 hover:bg-yellow-500/30" 
-                    : "bg-green-500/20 hover:bg-green-500/30"
+                  "px-5 py-3 rounded-xl font-bold flex items-center gap-2 text-base border-2 shadow-lg cursor-pointer z-50",
+                  isTimerRunning 
+                    ? "bg-yellow-500/30 hover:bg-yellow-500/50 border-yellow-500/50 text-yellow-300 shadow-yellow-500/20" 
+                    : "bg-green-500/30 hover:bg-green-500/50 border-green-500/50 text-green-300 shadow-green-500/20"
                 )}
               >
-                {gameState === 'playing' ? (
-                  <><Pause className="w-4 h-4" /> PAUSE</>
+                {isTimerRunning ? (
+                  <><Pause className="w-5 h-5" /> PAUSE</>
                 ) : (
-                  <><Play className="w-4 h-4" /> RESUME</>
+                  <><Play className="w-5 h-5" /> RESUME</>
                 )}
               </motion.button>
               
@@ -739,9 +798,9 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={handleRestart}
-                className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 rounded-lg font-medium flex items-center gap-1.5 text-sm"
+                className="px-5 py-3 bg-purple-500/30 hover:bg-purple-500/50 border-2 border-purple-500/50 rounded-xl font-bold flex items-center gap-2 text-base shadow-lg shadow-purple-500/20"
               >
-                <RotateCcw className="w-4 h-4" /> RESTART
+                <RotateCcw className="w-5 h-5" /> RESTART
               </motion.button>
             </div>
             
@@ -925,7 +984,7 @@ export default function BridgeGame({ player, onComplete, difficulty = 'medium', 
   // Menu Overlay
   if (showMenu) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
